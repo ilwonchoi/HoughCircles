@@ -8,6 +8,7 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
@@ -20,7 +21,7 @@ import java.io.IOException;
  * Hough Gui Class
  */
 public class HoughGui extends JPanel {
-    /**
+    /*
      * UI Elements
      */
     private JButton loadImageButton;
@@ -64,17 +65,24 @@ public class HoughGui extends JPanel {
     BufferedImage baseImage;
     BufferedImage greyscaleImage;
     BufferedImage edgeImage;
+    BufferedImage accumulatorImage;
 
     //Matrices - the pixel values of the images are extracted into a matrix for easy processing
     Integer[][] greyscaleImageMatrix;
     Integer[][] edgeImageMatrix;
+    Integer[][] accumulatorImageMatrix;
+
+    //The accumulator radius
+    int accumlatorRadius;
     /**
      * Default Constructor
      */
     public HoughGui() {
         //set buttons disabledButton
         setButtonStatus();
-        /**
+        //set size of textfield
+        accumulatorRadiusTextField.setPreferredSize(new Dimension(50,26));
+        /*
          * Load an image
          */
         loadImageButton.addActionListener(new ActionListener() {
@@ -118,7 +126,7 @@ public class HoughGui extends JPanel {
                 fc.setSelectedFile(null);
             }
         });
-        /**
+        /*
          * Display the base image
          */
         baseImageButton.addActionListener(new ActionListener() {
@@ -129,7 +137,7 @@ public class HoughGui extends JPanel {
                 frame.pack();
             }
         });
-        /**
+        /*
          * Display the Greyscale Image
          */
         greyscaleButton.addActionListener(new ActionListener() {
@@ -151,13 +159,15 @@ public class HoughGui extends JPanel {
                 frame.pack();
             }
         });
-        /**
+        /*
          * Display Accumulator Image
          */
         accumulatorButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-
+                setButtonDisabled(accumulatorButton);
+                displayImage.setIcon(new ImageIcon(accumulatorImage));
+                frame.pack();
             }
         });
         circlesButton.addActionListener(new ActionListener() {
@@ -172,7 +182,7 @@ public class HoughGui extends JPanel {
                 setButtonDisabled(circlesOverlayButton);
             }
         });
-        /**
+        /*
          * Edge detection radio action listeners
          */
         simpleEdgeDetection.addActionListener(new ActionListener() {
@@ -230,20 +240,35 @@ public class HoughGui extends JPanel {
                 }
             }
         });
-        /**
+        /*
          * Accumulator Radius slider
          */
         accumulatorRadiusSlider.addChangeListener(new ChangeListener() {
             @Override
             public void stateChanged(ChangeEvent e) {
                 accumulatorRadiusTextField.setText(((JSlider)e.getSource()).getValue()+"");
+                accumlatorRadius = ((JSlider)e.getSource()).getValue();
+                processImage();
+                if (disabledButton.getText().equals("Accumulator")) {
+                    displayImage.setIcon(new ImageIcon(accumulatorImage));
+                    frame.pack();
+                }
             }
         });
+        /*
+         * Accumulator text field
+         */
         accumulatorRadiusTextField.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (((JTextField)e.getSource()).getText().matches("^-?\\d+$")) {
+                if (((JTextField)e.getSource()).getText().matches("^-?\\d+$")) { //check if int
                     accumulatorRadiusSlider.setValue(Integer.parseInt(((JTextField)e.getSource()).getText()));
+                    accumlatorRadius = Integer.parseInt(((JTextField)e.getSource()).getText());
+                    processImage();
+                    if (disabledButton.getText().equals("Accumulator")) {
+                        displayImage.setIcon(new ImageIcon(accumulatorImage));
+                        frame.pack();
+                    }
                 }
             }
         });
@@ -292,6 +317,10 @@ public class HoughGui extends JPanel {
         edgesButtonAvailable = true;
         setButtonStatus();
         setButtonDisabled(disabledButton);
+        generateAccumulator();
+        accumulatorButtonAvailable = true;
+        setButtonStatus();
+        setButtonDisabled(disabledButton);
     }
 
     /**
@@ -329,6 +358,17 @@ public class HoughGui extends JPanel {
         for (int y = 0; y < edgeImageMatrix.length; y++){
             for (int x = 0; x < edgeImageMatrix[y].length; x++){
                 edgeImage.setRGB(x, y, edgeImageMatrix[y][x]);
+            }
+        }
+    }
+
+    private void generateAccumulator () {
+        accumulatorImageMatrix = Hough.getAccumulatorAtRadius(edgeImageMatrix, accumlatorRadius);
+        //convert the matrix back to an image
+        accumulatorImage = new BufferedImage(accumulatorImageMatrix[0].length, accumulatorImageMatrix.length, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < accumulatorImageMatrix.length; y++){
+            for (int x = 0; x < accumulatorImageMatrix[y].length; x++){
+                accumulatorImage.setRGB(x, y, accumulatorImageMatrix[y][x]);
             }
         }
     }

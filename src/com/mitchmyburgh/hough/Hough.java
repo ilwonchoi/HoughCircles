@@ -4,11 +4,30 @@ import java.lang.ArrayIndexOutOfBoundsException;
 
 public class Hough {
 
-    public Hough (){
-
+    /**
+     * Get teh accumulator for the specified circle radius
+     * @param imageMatrix the image matrix to be processed
+     * @param radius the radius of teh circles to find
+     * @return
+     */
+    public static Integer[][] getAccumulatorAtRadius(Integer[][] imageMatrix, int radius){
+        Integer [][] output = new Integer[imageMatrix.length][imageMatrix[0].length];
+        for (int y = 0; y < output.length; y++){
+            for (int x = 0; x < output[y].length; x++){
+                output[y][x] = 0;
+            }
+        }
+        for (int y = 0; y < imageMatrix.length; y++){
+            for (int x = 0; x < imageMatrix[y].length; x++){
+                if (imageMatrix[y][x] == -1){
+                    output = drawCircle(x,y, radius, output);
+                }
+            }
+        }
+        return output;
     }
 
-    public Integer [][] transform(Integer[][] imageMatrix, int skip_points){
+    public static Integer [][] transform(Integer[][] imageMatrix, int skip_points){
         Integer [][] output = new Integer[imageMatrix.length][imageMatrix[0].length];
         Integer [][] circles = new Integer[imageMatrix.length][imageMatrix[0].length];
         Integer [][] gradientOutput = null;
@@ -89,7 +108,7 @@ circles = drawCircle(x, y, 40, circles);
         return circles;
     }
 
-    public Integer [][] transform2(Integer[][] imageMatrix, int skip_points){
+    public static Integer [][] transform2(Integer[][] imageMatrix, int skip_points){
         Integer [][] output = new Integer[imageMatrix.length][imageMatrix[0].length];
         Integer [][] circles = new Integer[imageMatrix.length][imageMatrix[0].length];
         Integer [][] gradientOutput = null;
@@ -144,7 +163,7 @@ circles = drawCircle(x, y, 40, circles);
     }
 
     //Sobel filter for differentiation
-    public Integer[][] sobel(Integer[][] imageMatrix) {
+    public static Integer[][] sobel(Integer[][] imageMatrix) {
         Integer[][] output = new Integer[imageMatrix.length][imageMatrix[0].length];
         for (int y = 0; y < imageMatrix.length; y++){
             for (int x = 0; x < imageMatrix[y].length; x++){
@@ -199,7 +218,7 @@ circles = drawCircle(x, y, 40, circles);
     }
 
     //https://en.wikipedia.org/wiki/Midpoint_circle_algorithm
-    private Integer[][] drawCircle(int x0, int y0, int radius, Integer[][] output){
+    private static Integer[][] drawCircle(int x0, int y0, int radius, Integer[][] output){
         int x = radius;
         int y = 0;
         int err = 0;

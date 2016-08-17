@@ -63,7 +63,7 @@
           <text value=""/>
         </properties>
       </component>
-      <grid id="13566" binding="edgeDetectionOptions" layout-manager="GridLayoutManager" row-count="7" column-count="1" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
+      <grid id="13566" binding="edgeDetectionOptions" layout-manager="GridLayoutManager" row-count="6" column-count="1" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
         <margin top="0" left="0" bottom="0" right="0"/>
         <constraints border-constraint="West"/>
         <properties/>
@@ -118,16 +118,6 @@
               <text value="Canny"/>
             </properties>
           </component>
-          <component id="36ac4" class="javax.swing.JTextField" binding="accumulatorRadiusTextField">
-            <constraints>
-              <grid row="6" column="0" row-span="1" col-span="1" vsize-policy="0" hsize-policy="6" anchor="8" fill="1" indent="0" use-parent-layout="false">
-                <preferred-size width="150" height="-1"/>
-              </grid>
-            </constraints>
-            <properties>
-              <text value="0"/>
-            </properties>
-          </component>
         </children>
       </grid>
       <grid id="80db0" layout-manager="FlowLayout" hgap="5" vgap="5" flow-align="1">
@@ -146,6 +136,13 @@
             <properties>
               <maximum value="400"/>
               <value value="0"/>
+            </properties>
+          </component>
+          <component id="36ac4" class="javax.swing.JTextField" binding="accumulatorRadiusTextField">
+            <constraints/>
+            <properties>
+              <minimumSize width="50" height="26"/>
+              <text value="0"/>
             </properties>
           </component>
         </children>
