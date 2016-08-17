@@ -5,38 +5,47 @@ import java.lang.ArrayIndexOutOfBoundsException;
 public class Hough {
 
     /**
-     * Get teh accumulator for the specified circle radius
+     * Get the accumulator for the specified circle radius
      * @param imageMatrix the image matrix to be processed
      * @param radius the radius of teh circles to find
      * @return
      */
     public static Integer[][] getAccumulatorAtRadius(Integer[][] imageMatrix, int radius){
-        Integer [][] output = new Integer[imageMatrix.length][imageMatrix[0].length];
+        Integer [][] output = new Integer[imageMatrix.length+200][imageMatrix[0].length+200]; //increase the size of the image for occluded circles
+        //zero out the output
         for (int y = 0; y < output.length; y++){
             for (int x = 0; x < output[y].length; x++){
                 output[y][x] = 0;
             }
         }
+        //draw circles of radius, radius, around each edge point
         for (int y = 0; y < imageMatrix.length; y++){
             for (int x = 0; x < imageMatrix[y].length; x++){
                 if (imageMatrix[y][x] == -1){
-                    output = drawCircle(x,y, radius, output);
+                    output = drawCircle(x+100,y+100, radius, output);
                 }
             }
         }
         return output;
     }
 
-    public static Integer [][] transform(Integer[][] imageMatrix, int skip_points){
-        Integer [][] output = new Integer[imageMatrix.length][imageMatrix[0].length];
-        Integer [][] circles = new Integer[imageMatrix.length][imageMatrix[0].length];
-        Integer [][] gradientOutput = null;
+    /**
+     * Transform edges into hough space and detect circles
+     * @param imageMatrix the edge image matrix
+     * @param skip_points skip skip_points-1 points for speed
+     * @return Integer [][] the detected circles
+     */
+    public static Integer [][] transform(Integer[][] imageMatrix, Integer[][] greyscale, int skip_points){
+        Integer [][] output = new Integer[imageMatrix.length+200][imageMatrix[0].length+200]; //increase the size of the image for occluded circles
+        Integer [][] circles = new Integer[imageMatrix.length+200][imageMatrix[0].length+200]; //increase the size of the image for occluded circles
+
+        //zero output
         for (int y = 0; y < output.length; y++){
             for (int x = 0; x < output[y].length; x++){
                 output[y][x] = 0;
             }
         }
-
+        //zero circles
         for (int y = 0; y < circles.length; y++){
             for (int x = 0; x < circles[y].length; x++){
                 circles[y][x] = 0;
@@ -44,34 +53,117 @@ public class Hough {
         }
 
 
-        int circlesDetected = 0;
-        int max = -100;
-        int prevMax = -100;
-
-        for (int i = 10; i < Math.max(imageMatrix.length, imageMatrix[0].length); i++){
+        int circlesDetected; //number of circles detected per radius
+        int max; //max in the current frame
+        int overallMax = -100; //max over all seen frames
+        //loop over radius
+        for (int i = 12; i < 100; i++){//Math.max(imageMatrix.length, imageMatrix[0].length)
             circlesDetected = 0;
             max = -100;
+            //loop overt pixels in image
             for (int y = 0; y < imageMatrix.length; y++){
                 for (int x = 0; x < imageMatrix[y].length; x++){
                     if (x%skip_points == 0 && y%skip_points ==0 && imageMatrix[y][x] == -1){
-                        output = drawCircle(x,y, i, output);
+                        output = drawCircle(x+100,y+100, i, output);
                     }
                 }
             }
+            //find max
             for (int y = 0; y < output.length; y++){
                 for (int x = 0; x < output[y].length; x++){
                     max = Math.max(output[y][x], max);
+
                 }
             }
-            gradientOutput = sobel(output);
-            for (int y = 0; y < gradientOutput.length; y++){
-                for (int x = 0; x < gradientOutput[y].length; x++){
-                    if (output[y][x] >= Math.max(max, 75)){
-                        circles = drawCircle(x, y, i, circles);
-                        circlesDetected++;
+            //set overall max
+            overallMax = Math.max(max, overallMax);
+            //draw the detected circles
+            for (int y = 21; y < output.length-21; y++){
+                for (int x = 21; x < output[y].length-21; x++){
+                    //check if point represents circle
+                    if (output[y][x] >= Math.max(max, overallMax)){
+                        Boolean draw = true;
+                        for (int j = 1; j < 20; j++){ //check for nearby maxes
+                            try {
+                                if (output[y + j][x] >= output[y][x]-4 ||
+                                        output[y][x + j] >= output[y][x]-4 ||
+                                        output[y - j][x] >= output[y][x]-4 ||
+                                        output[y][x - j] >= output[y][x]-4 ||
+                                        output[y - j][x - j] >= output[y][x]-4 ||
+                                        output[y + j][x - j] >= output[y][x]-4 ||
+                                        output[y - j][x + j] >= output[y][x]-4 ||
+                                        output[y + j][x + j] >= output[y][x]-4) {
+                                    draw = false;
+                                    break;
+                                }
+                            } catch (ArrayIndexOutOfBoundsException e){
+
+                            }
+                        }
+                        if (draw) { //draw the circle into the accumulator
+                            circles = drawCircle(x, y, i, circles);
+                            circlesDetected++;
+                        }
+                    }
+
+
+                }
+            }
+            /*
+             * detect occluded circles
+             */
+            if (circlesDetected != 0) { //check that a circle has already been found with this radius - bit of a hack but prevents most false positives
+                for (int y = 21; y < output.length-21; y++){
+                    for (int x = 21; x < output[y].length-21; x++){
+                        //if point is out of normal bounds then it could be an occluded circle
+                        if ((x < 100+i || y < 100+i || y > output.length-100-i || x > output[y].length-100-i) ) {
+                            Boolean draw = true;
+                            //find local maxes
+                            int localMax = -100;
+                            for (int j = 0; j < i; j++){
+                                for (int k = 0; k < i; k++) {
+                                    try {
+                                        localMax = Math.max(localMax, output[y + (j - 10)][x + (k - 10)]);
+
+                                    } catch (ArrayIndexOutOfBoundsException e) {
+                                    }
+                                }
+                            }
+                            //check if the center of the circle is black, then dont draw it
+                            try {
+                                if (!(x < 100 || y < 100 || y > output.length-100 || x > output[y].length-100) && (greyscale[y-100][x-100] <= 1 && greyscale[y-100][x-100] >= -1)){
+                                    draw = false;
+                                }
+                            } catch (ArrayIndexOutOfBoundsException e) {
+                            }
+                            if (output[y][x] >= localMax){
+                                for (int j = 1; j < 20; j++){ //check for nearby maxes
+                                    try {
+                                        if (output[y + j][x] >= output[y][x]-4 ||
+                                                output[y][x + j] >= output[y][x]-4 ||
+                                                output[y - j][x] >= output[y][x]-4 ||
+                                                output[y][x - j] >= output[y][x]-4 ||
+                                                output[y - j][x - j] >= output[y][x]-4 ||
+                                                output[y + j][x - j] >= output[y][x]-4 ||
+                                                output[y - j][x + j] >= output[y][x]-4 ||
+                                                output[y + j][x + j] >= output[y][x]-4) {
+                                            draw = false;
+                                            break;
+                                        }
+                                    } catch (ArrayIndexOutOfBoundsException e){
+
+                                    }
+                                }
+                                if (draw) { // draw circle into accumulator
+                                    circles = drawCircle(x, y, i, circles);
+                                    circlesDetected++;
+                                }
+                            }
+                        }
                     }
                 }
             }
+            //zero output
             for (int y = 0; y < output.length; y++){
                 for (int x = 0; x < output[y].length; x++){
                     output[y][x] = 0;
@@ -80,24 +172,7 @@ public class Hough {
             System.out.println("Detected "+circlesDetected+" circles for radius "+i+" with max "+max);
         }
 
-
-		/*Integer [][] gradientOutput = sobel(output);
-
-		Integer [][] circles = new Integer[gradientOutput.length][gradientOutput[0].length];
-		for (int y = 0; y < circles.length; y++){
-		for (int x = 0; x < circles[y].length; x++){
-		circles[y][x] = 0;
-	}
-}*/
-
-/*for (int y = 0; y < gradientOutput.length; y++){
-for (int x = 0; x < gradientOutput[y].length; x++){
-if (gradientOutput[y][x] < 0.01 && gradientOutput[y][x] > -0.01 && output[y][x] >= 3000){
-circles = drawCircle(x, y, 40, circles);
-}
-}
-}*/
-
+        //ouput array of circles
         for (int y = 0; y < circles.length; y++){
             for (int x = 0; x < circles[y].length; x++){
                 if (circles[y][x] != 0){
@@ -108,116 +183,15 @@ circles = drawCircle(x, y, 40, circles);
         return circles;
     }
 
-    public static Integer [][] transform2(Integer[][] imageMatrix, int skip_points){
-        Integer [][] output = new Integer[imageMatrix.length][imageMatrix[0].length];
-        Integer [][] circles = new Integer[imageMatrix.length][imageMatrix[0].length];
-        Integer [][] gradientOutput = null;
-        for (int y = 0; y < output.length; y++){
-            for (int x = 0; x < output[y].length; x++){
-                output[y][x] = 0;
-            }
-        }
 
-        for (int y = 0; y < circles.length; y++){
-            for (int x = 0; x < circles[y].length; x++){
-                circles[y][x] = 0;
-            }
-        }
-
-
-        int max = -100;
-
-        for (int i = 10; i < Math.max(imageMatrix.length, imageMatrix[0].length); i++){
-            for (int y = 0; y < imageMatrix.length; y++){
-                for (int x = 0; x < imageMatrix[y].length; x++){
-                    if (x%skip_points == 0 && y%skip_points ==0 && imageMatrix[y][x] == -1){
-                        output = drawCircle(x,y, i, output);
-                    }
-                }
-            }
-        }
-
-        for (int y = 0; y < output.length; y++){
-            for (int x = 0; x < output[y].length; x++){
-                max = Math.max(output[y][x], max);
-            }
-        }
-        gradientOutput = sobel(output);
-
-        for (int y = 0; y < gradientOutput.length; y++){
-            for (int x = 0; x < gradientOutput[y].length; x++){
-                if (gradientOutput[y][x] < 0.01 && gradientOutput[y][x] > -0.01 && output[y][x] >= max-100){
-                    circles = drawCircle(x, y, 40, circles);
-                }
-            }
-        }
-
-        for (int y = 0; y < circles.length; y++){
-            for (int x = 0; x < circles[y].length; x++){
-                if (circles[y][x] != 0){
-                    circles[y][x] = -1;
-                }
-            }
-        }
-        return circles;
-    }
-
-    //Sobel filter for differentiation
-    public static Integer[][] sobel(Integer[][] imageMatrix) {
-        Integer[][] output = new Integer[imageMatrix.length][imageMatrix[0].length];
-        for (int y = 0; y < imageMatrix.length; y++){
-            for (int x = 0; x < imageMatrix[y].length; x++){
-                int Gx = 0;
-                int Gy = 0;
-                //left
-                if (x != 0){
-                    Gx += -2*imageMatrix[y][x-1];
-                }
-                //right
-                if (x != imageMatrix[y].length-1){
-                    Gx += 2*imageMatrix[y][x+1];
-                }
-                //top
-                if (y != 0){
-                    Gy += -2*imageMatrix[y-1][x];
-                }
-                //bottom
-                if (y != imageMatrix.length-1){
-                    Gy += 2*imageMatrix[y+1][x];
-                }
-                //top left
-                if (x != 0 && y != 0){
-                    Gx += -1*imageMatrix[y-1][x-1];
-                    Gy += -1*imageMatrix[y-1][x-1];
-                }
-                //top right
-                if (x != imageMatrix[y].length-1 && y != 0){
-                    Gx += 1*imageMatrix[y-1][x+1];
-                    Gy += -1*imageMatrix[y-1][x+1];
-                }
-                //bottom left
-                if (x != 0 && y != imageMatrix.length-1){
-                    Gx += -1*imageMatrix[y+1][x-1];
-                    Gy += 1*imageMatrix[y+1][x-1];
-                }
-                //bottom right
-                if (x != imageMatrix[y].length-1 && y != imageMatrix.length-1){
-                    Gx += 1*imageMatrix[y+1][x+1];
-                    Gy += 1*imageMatrix[y+1][x+1];
-                }
-                //Average the G values along x and y
-                output[y][x] = (int)(Math.sqrt(Gx*Gx+Gy*Gy) + 0.5d);
-                if (output[y][x] < 200 && output[y][x] > -200) { //threshholding makes edges a bit more jagged but we get a nice binary image
-                    output[y][x] = 0;
-                } else {
-                    output[y][x] = -1;
-                }
-            }
-        }
-        return output;
-    }
-
-    //https://en.wikipedia.org/wiki/Midpoint_circle_algorithm
+    /**
+     * Draw circle from https://en.wikipedia.org/wiki/Midpoint_circle_algorithm
+     * @param x0 x center
+     * @param y0 y center
+     * @param radius radius
+     * @param output matrix to write circle to
+     * @return
+     */
     private static Integer[][] drawCircle(int x0, int y0, int radius, Integer[][] output){
         int x = radius;
         int y = 0;
